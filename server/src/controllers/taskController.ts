@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { TaskModel } from '../models/Task';
+import { TaskModel, TaskStatus } from '../models/Task';
 import { AnnotationModel } from '../models/Annotation';
 import { uploadToS3 } from '../services/s3Service';
 import { AuthenticatedRequest } from '../middleware/authMiddleware';
@@ -61,8 +61,15 @@ export const uploadTaskMedia = async (req: AuthenticatedRequest, res: Response) 
  */
 export const updateTaskStatus = async (req: AuthenticatedRequest, res: Response) => {
   const { taskId } = req.params;
-  const { status } = req.body;
-  const task = await TaskModel.findByIdAndUpdate(taskId, { status }, { new: true });
+  const { status } = req.body as { status: TaskStatus };
+
+  const allowedStatuses: TaskStatus[] = ['pending', 'in_progress', 'awaiting_review', 'approved', 'rejected'];
+
+  if (!status || !allowedStatuses.includes(status)) {
+    return res.status(400).json({ message: 'Invalid status value' });
+  }
+
+  const task = await TaskModel.findByIdAndUpdate(taskId, { status }, { new: true, runValidators: true });
   if (!task) {
     return res.status(404).json({ message: 'Task not found' });
   }
