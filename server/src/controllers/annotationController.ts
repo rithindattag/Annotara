@@ -13,20 +13,35 @@ export const createOrUpdateAnnotations = async (req: AuthenticatedRequest, res: 
   if (!req.user?.id) {
     return res.status(401).json({ message: 'Not authenticated' });
   }
+  if (!Array.isArray(annotations)) {
+    return res.status(400).json({ message: 'Annotations must be an array' });
+  }
+
+  const task = await TaskModel.findById(taskId);
+  if (!task) {
+    return res.status(404).json({ message: 'Task not found' });
+  }
+
+  const userId = req.user.id;
+  const isAssignedToUser = task.assignedTo?.toString() === userId;
+  const isLockedByUser = task.lockedBy?.toString() === userId;
+
+  if (!isAssignedToUser && !isLockedByUser) {
+    return res.status(403).json({ message: 'You are not assigned to or holding the lock for this task' });
+  }
+
   await AnnotationModel.deleteMany({ task: taskId });
   const docs = await AnnotationModel.insertMany(
-    annotations.map(annotation => ({ task: taskId, annotator: req.user?.id, data: annotation }))
+    annotations.map(annotation => ({ task: taskId, annotator: userId, data: annotation }))
   );
-  const task = await TaskModel.findById(taskId);
-  if (task) {
-    task.status = 'awaiting_review';
-    task.lockedBy = null;
-    task.reviewedBy = null;
-    task.reviewNotes = null;
-    task.reviewedAt = null;
-    await task.save();
-    emitTaskUpdate(task);
-  }
+
+  task.status = 'awaiting_review';
+  task.lockedBy = null;
+  task.reviewedBy = null;
+  task.reviewNotes = null;
+  task.reviewedAt = null;
+  await task.save();
+  emitTaskUpdate(task);
   res.json({ annotations: docs });
 };
 

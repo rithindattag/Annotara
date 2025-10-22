@@ -8,7 +8,7 @@ import {
   updateTaskStatus,
   uploadTaskMedia
 } from '../controllers/taskController';
-import { authenticate } from '../middleware/authMiddleware';
+import { authenticate, authorize } from '../middleware/authMiddleware';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -19,7 +19,7 @@ router.use(authenticate);
 router.get('/', getTasks);
 router.post('/upload', upload.single('file'), uploadTaskMedia);
 router.get('/:taskId', getTaskById);
-router.post('/:taskId/status', updateTaskStatus);
+router.post('/:taskId/status', authorize(['Reviewer', 'Admin']), updateTaskStatus);
 router.post('/:taskId/lock', lockTask);
 router.post('/:taskId/unlock', unlockTask);
 
